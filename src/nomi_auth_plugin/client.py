@@ -10,12 +10,12 @@ class BackendError(Exception):
 
 
 MESSAGES = {
-    "IDENTITY_ALREADY_BOUND": "你在这个群内已有账号，请登录或找回密码。",
+    "IDENTITY_ALREADY_BOUND": "你在这个群内已有账号，请通过群验证码登录。",
     "INVALID_CODE": "验证码无效，请检查后重试。",
     "CODE_USED": "验证码已使用或申请已结束。",
     "REQUEST_EXPIRED": "验证码已过期，请在启动器重新申请。",
     "NAME_TAKEN": "用户名已被占用，请在启动器重新申请。",
-    "IDENTITY_MISMATCH": "你无法验证这份找回申请。",
+    "IDENTITY_MISMATCH": "必须使用该账号绑定的群成员身份登录。",
     "WRONG_GROUP": "当前群或机器人不在后端允许范围。",
     "RATE_LIMITED": "请求过于频繁，请稍后重试。",
 }
@@ -50,7 +50,7 @@ class AuthClient:
         path = (
             "/internal/v1/registrations/redeem"
             if operation == "注册"
-            else "/internal/v1/recoveries/verify"
+            else "/internal/v1/logins/verify"
         )
         # A single FIFO lock keeps submissions ordered, including retries.
         async with self.lock:
