@@ -2,10 +2,26 @@
 
 Nomi 账号注册验证的 NoneBot 插件，位于现有 nomi-bot 实例内，使用 QQ 官方适配器。
 
-## 计划功能
+## 安装到现有实例
 
-- 接收指定群中的注册验证命令。
-- 将消息发送者身份、群身份和验证码提交给 Nomi Auth。
-- 返回验证结果；账号创建与唯一性检查由后端执行。
+在 `nomi-bot` 目录执行：
 
-当前仓库仅完成初始化，尚未实现插件。父目录的机器人配置、.env.prod 和虚拟环境不属于本仓库。
+```text
+uv pip install --python .venv/Scripts/python.exe -e ./nomi-auth-plugin
+```
+
+Linux 将 Python 路径改为 `.venv/bin/python`。在实例 pyproject.toml 的 `[tool.nonebot.plugins]` 中，将 `nomi-auth-plugin = ["nomi_auth_plugin"]` 加入配置，或在机器人入口调用 `nonebot.load_plugin("nomi_auth_plugin")`，不要同时重复加载。
+
+把 `.env.example` 的字段加入实例环境配置，机器人应用 ID、群 OpenID 和 API 凭证须与后端一致。命令前缀由实例配置 `COMMAND_START=["", "/"]` 控制，支持 `@机器人 注册 <码>`、`找回 <码>` 和 `账号帮助`。不修改已有 QQ 平台密钥。
+
+后端不在线时有限重试，保留同一消息 ID；注册命令串行处理。群内只返回操作结果，不透露密码、管理令牌或其他用户的资料。
+
+## 开发检查
+
+```text
+uv sync --python 3.12
+uv run pytest -q
+uv run ruff check src tests
+```
+
+父目录的机器人配置、.env.prod 和虚拟环境不属于本仓库。真实群事件与正式机器人权限仍需联调；插件测试使用模拟 HTTP，不登录 QQ。

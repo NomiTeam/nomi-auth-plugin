@@ -17,3 +17,4 @@ build/
 .vscode/
 desktop.ini
 Thumbs.db
+.ruff_cache/
