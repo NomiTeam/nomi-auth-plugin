@@ -27,3 +27,7 @@ uv run ruff check src tests
 ```
 
 父目录的机器人配置、.env.prod 和虚拟环境不属于本仓库。当前测试群已验证统一登录触发注册、成功回复和游戏会话领取。插件自动化测试使用模拟 HTTP，不登录 QQ。
+
+## lobby 部署
+
+实例位于 /home/naipu/minecraft/nomi-bot，归 mcadmin:mcadmin。使用 deploy/bot.service 注册系统服务 bot，配置保存在实例 .env 和 .env.prod（0600），后端地址为 http://127.0.0.1:8000。应用目录内的 bot.py 加载 QQ 适配器及本插件，systemd 管理开机启动与失败重启，无需 nb --reload。

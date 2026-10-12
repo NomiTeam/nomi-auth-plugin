@@ -1,0 +1,17 @@
+[Unit]
+Description=Nomi QQ NoneBot
+After=network-online.target nomi-auth.service
+Wants=network-online.target nomi-auth.service
+[Service]
+User=mcadmin
+Group=mcadmin
+WorkingDirectory=/home/naipu/minecraft/nomi-bot
+ExecStart=/home/naipu/minecraft/nomi-bot/.venv/bin/python /home/naipu/minecraft/nomi-bot/bot.py
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+[Install]
+WantedBy=multi-user.target
