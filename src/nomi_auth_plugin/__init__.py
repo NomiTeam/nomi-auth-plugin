@@ -1,9 +1,9 @@
-"""Nomi QQ official-adapter plugin. Secrets are configured on the host instance."""
+"""Single-group, passwordless Nomi login, registration and profile naming."""
 
 from nonebot import get_driver, get_plugin_config, logger, on_command, on_message
 from nonebot.adapters.qq import Bot
 from nonebot.adapters.qq.event import GroupMessageCreateEvent
-from nonebot.adapters.qq.message import Message
+from nonebot.adapters.qq.message import Message, MessageSegment
 from nonebot.params import CommandArg
 from nonebot.plugin import PluginMetadata
 
@@ -12,12 +12,11 @@ from .config import Config
 
 __plugin_meta__ = PluginMetadata(
     name="Nomi 账号验证",
-    description="指定 QQ 群内的一次验证码注册与登录",
-    usage="@机器人 注册 <码> 或 登录 <码>",
+    description="群验证码登录，未注册成员在群内选择账号 ID",
+    usage="登录 <验证码>；按提示注册 <id>；改名 <新id>",
     config=Config,
     supported_adapters={"~qq"},
 )
-
 config = get_plugin_config(Config)
 backend = AuthClient(config)
 get_driver().on_shutdown(backend.close)
@@ -31,9 +30,9 @@ async def allowed(bot: Bot, event: GroupMessageCreateEvent) -> bool:
     )
 
 
-register = on_command("注册", rule=allowed, priority=10, block=True)
 login = on_command("登录", rule=allowed, priority=10, block=True)
-help_command = on_command("账号帮助", rule=allowed, priority=10, block=True)
+register = on_command("注册", rule=allowed, priority=10, block=True)
+rename = on_command("改名", rule=allowed, priority=10, block=True)
 
 
 async def discovery_enabled(event: GroupMessageCreateEvent) -> bool:
@@ -48,39 +47,41 @@ discovery = on_message(rule=discovery_enabled, priority=11, block=False)
 
 @discovery.handle()
 async def handle_discovery(bot: Bot, event: GroupMessageCreateEvent):
-    # Explicit opt-in discovery writes only app/group identifiers to the local log.
     logger.info(
         "Nomi discovery: bot_app_id={} group_openid={}", bot.self_id, event.group_openid
     )
 
 
 async def process(operation, matcher, bot, event, argument):
-    if (
-        event.group_openid != config.nomi_allowed_group_openid
-        or bot.self_id != config.nomi_bot_app_id
-    ):
+    if not await allowed(bot, event):
         return
-    code = argument.extract_plain_text().strip()
-    if not code or len(code) > 64 or len(code.split()) != 1:
-        await matcher.finish(f"用法：@机器人 {operation} <启动器显示的验证码>")
+    value = argument.extract_plain_text().strip()
+    if operation == "登录" and (
+        not value or len(value) > 64 or len(value.split()) != 1
+    ):
+        await matcher.finish("用法：登录 <启动器显示的验证码>")
+    if operation != "登录" and len(value) > 64:
+        # Send a short invalid value to end a pending registration atomically.
+        value = "!"
     try:
-        await backend.submit(
-            operation, code, event.group_openid, event.author.member_openid, event.id
+        result = await backend.submit(
+            operation, value, event.group_openid, event.author.member_openid, event.id
         )
     except BackendError as error:
         await matcher.finish(str(error))
-    await matcher.finish(
-        "注册成功，请查看启动器。"
-        if operation == "注册"
-        else "登录验证成功，请查看启动器。"
+    if result["status"] == "AWAITING_NAME":
+        await matcher.finish(
+            MessageSegment.mention_user(event.author.member_openid)
+            + " 你还没有账号，请在验证码到期前发送：注册 <id>。"
+            + "ID 为 3 至 16 位字母、数字或下划线；名称冲突会结束本次申请。"
+        )
+    verb = {"VERIFIED": "登录", "REGISTERED": "注册", "RENAMED": "改名"}[
+        result["status"]
+    ]
+    suffix = (
+        "请重新登录启动器，UUID 保持不变。" if operation == "改名" else "请查看启动器。"
     )
-
-
-@register.handle()
-async def handle_register(
-    bot: Bot, event: GroupMessageCreateEvent, argument: Message = CommandArg()
-):
-    await process("注册", register, bot, event, argument)
+    await matcher.finish(f"{verb}成功，账号 ID：{result['name']}。{suffix}")
 
 
 @login.handle()
@@ -90,9 +91,15 @@ async def handle_login(
     await process("登录", login, bot, event, argument)
 
 
-@help_command.handle()
-async def handle_help(event: GroupMessageCreateEvent):
-    if event.group_openid == config.nomi_allowed_group_openid:
-        await help_command.finish(
-            "在 Nomi 启动器申请后，@机器人 注册 <码>。已有账号或重装启动器时点击登录，再发送 登录 <码>。"
-        )
+@register.handle()
+async def handle_register(
+    bot: Bot, event: GroupMessageCreateEvent, argument: Message = CommandArg()
+):
+    await process("注册", register, bot, event, argument)
+
+
+@rename.handle()
+async def handle_rename(
+    bot: Bot, event: GroupMessageCreateEvent, argument: Message = CommandArg()
+):
+    await process("改名", rename, bot, event, argument)

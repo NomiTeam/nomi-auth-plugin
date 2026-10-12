@@ -1,11 +1,3 @@
-'''
-Description: Description
-version: 1.0.0
-Author: Naipu
-Date: 2026-10-12 12:46:16
-LastEditors: Naipu
-LastEditTime: 2026-10-12 14:03:50
-'''
 import asyncio
 
 import httpx
@@ -18,13 +10,18 @@ class BackendError(Exception):
 
 
 MESSAGES = {
-    "ACCOUNT_NOT_FOUND": "你在这个群内还没有账号，请先在启动器注册。",
+    "NO_PENDING_REGISTRATION": "没有待注册申请，请先发送启动器的登录码。",
+    "REQUEST_IN_PROGRESS": "你已有待注册申请，请先完成或关闭启动器窗口。",
+    "INVALID_NAME": "ID 须为 3 至 16 位字母、数字或下划线，本次请求已关闭。",
+    "INVALID_REQUEST": "请求格式无效，请重新申请。",
+    "RENAME_COOLDOWN": "尚在 7 天改名冷却期，本次请求已关闭。",
+    "ACCOUNT_NOT_FOUND": "你在这个群内还没有账号，请先发送启动器的登录码。",
     "ACCOUNT_UNAVAILABLE": "该账号已停用，请联系管理员。",
     "IDENTITY_ALREADY_BOUND": "你在这个群内已有账号，请通过群验证码登录。",
     "INVALID_CODE": "验证码无效，请检查后重试。",
     "CODE_USED": "验证码已使用或申请已结束。",
     "REQUEST_EXPIRED": "验证码已过期，请在启动器重新申请。",
-    "NAME_TAKEN": "用户名已被占用，请在启动器重新申请。",
+    "NAME_TAKEN": "ID 已被占用，本次请求已关闭，请重新申请。",
     "IDENTITY_MISMATCH": "必须使用该账号绑定的群成员身份登录。",
     "WRONG_GROUP": "当前群或机器人不在后端允许范围。",
     "RATE_LIMITED": "请求过于频繁，请稍后重试。",
@@ -51,17 +48,17 @@ class AuthClient:
         if not self.config.enabled or group != self.config.nomi_allowed_group_openid:
             raise BackendError("仅支持指定群。")
         payload = {
-            "code": code,
+            ("code" if operation == "登录" else "name"): code,
             "bot_app_id": self.config.nomi_bot_app_id,
             "group_openid": group,
             "member_openid": member,
             "event_id": event_id,
         }
-        path = (
-            "/internal/v1/registrations/redeem"
-            if operation == "注册"
-            else "/internal/v1/logins/verify"
-        )
+        path = {
+            "登录": "/internal/v1/logins/verify",
+            "注册": "/internal/v1/logins/register",
+            "改名": "/internal/v1/profiles/rename",
+        }[operation]
         # A single FIFO lock keeps submissions ordered, including retries.
         async with self.lock:
             for attempt in range(3):
