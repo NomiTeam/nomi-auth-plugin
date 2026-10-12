@@ -77,9 +77,7 @@ async def process(operation, matcher, bot, event, argument):
     verb = {"VERIFIED": "登录", "REGISTERED": "注册", "RENAMED": "改名"}[
         result["status"]
     ]
-    suffix = (
-        "请重新登录启动器，UUID 保持不变。" if operation == "改名" else "请查看启动器。"
-    )
+    suffix = "请重新登录启动器。" if operation == "改名" else "请查看启动器。"
     await matcher.finish(f"{verb}成功，账号 ID：{result['name']}。{suffix}")
 
 
