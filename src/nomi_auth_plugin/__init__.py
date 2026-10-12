@@ -1,6 +1,6 @@
 """Nomi QQ official-adapter plugin. Secrets are configured on the host instance."""
 
-from nonebot import get_driver, get_plugin_config, on_command
+from nonebot import get_driver, get_plugin_config, logger, on_command, on_message
 from nonebot.adapters.qq import Bot
 from nonebot.adapters.qq.event import GroupAtMessageCreateEvent
 from nonebot.adapters.qq.message import Message
@@ -22,9 +22,36 @@ config = get_plugin_config(Config)
 backend = AuthClient(config)
 get_driver().on_shutdown(backend.close)
 
-register = on_command("注册", priority=10, block=True)
-recover = on_command("找回", priority=10, block=True)
-help_command = on_command("账号帮助", priority=10, block=True)
+
+async def allowed(bot: Bot, event: GroupAtMessageCreateEvent) -> bool:
+    return (
+        config.enabled
+        and event.group_openid == config.nomi_allowed_group_openid
+        and bot.self_id == config.nomi_bot_app_id
+    )
+
+
+register = on_command("注册", rule=allowed, priority=10, block=True)
+recover = on_command("找回", rule=allowed, priority=10, block=True)
+help_command = on_command("账号帮助", rule=allowed, priority=10, block=True)
+
+
+async def discovery_enabled(event: GroupAtMessageCreateEvent) -> bool:
+    return (
+        config.nomi_discovery
+        and event.get_message().extract_plain_text().strip().lstrip("/") == "Nomi群信息"
+    )
+
+
+discovery = on_message(rule=discovery_enabled, priority=11, block=False)
+
+
+@discovery.handle()
+async def handle_discovery(bot: Bot, event: GroupAtMessageCreateEvent):
+    # Explicit opt-in discovery writes only app/group identifiers to the local log.
+    logger.info(
+        "Nomi discovery: bot_app_id={} group_openid={}", bot.self_id, event.group_openid
+    )
 
 
 async def process(operation, matcher, bot, event, argument):

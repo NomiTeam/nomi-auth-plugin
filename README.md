@@ -16,6 +16,8 @@ Linux 将 Python 路径改为 `.venv/bin/python`。在实例 pyproject.toml 的 
 
 后端不在线时有限重试，保留同一消息 ID；注册命令串行处理。群内只返回操作结果，不透露密码、管理令牌或其他用户的资料。
 
+未填写配置时插件可加载，但注册与找回均禁用。暂时设置 `NOMI_DISCOVERY=true`，在目标群艾特机器人发送 `Nomi群信息`，本地日志会显示应用 ID 与群 OpenID，不向群发送这些字段；取得后关闭 discovery 并填写配置。QQ 官方适配器还需要开启群艾特消息事件权限，例如机器人配置中的 `intent.c2c_group_at_messages=true`。
+
 ## 开发检查
 
 ```text

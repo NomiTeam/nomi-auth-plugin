@@ -38,7 +38,7 @@ class AuthClient:
     async def submit(
         self, operation: str, code: str, group: str, member: str, event_id: str
     ):
-        if group != self.config.nomi_allowed_group_openid:
+        if not self.config.enabled or group != self.config.nomi_allowed_group_openid:
             raise BackendError("仅支持指定群。")
         payload = {
             "code": code,
