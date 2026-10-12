@@ -8,7 +8,7 @@
 - `注册 <id>`：仅认领申请的成员可使用。ID 为 3 至 16 位字母、数字或下划线。
 - `改名 <新id>`：修改本人游戏名，默认冷却 7 天，UUID 不变。
 
-成功回复显示当前 ID，不发送令牌，不艾特成员。是否需要艾特机器人取决于群消息权限；当前群支持直接发送。
+成功回复显示当前 ID，不发送令牌，不艾特成员。是否需要艾特机器人取决于群消息权限。
 
 ## 安装与配置
 
@@ -24,8 +24,10 @@ Linux 使用 `.venv/bin/python`。在实例入口调用 `nonebot.load_plugin("no
 
 需要获取群 ID 时临时启用 `NOMI_DISCOVERY=true`，在目标群发送 `Nomi群信息`；从本地日志读取应用和群 ID 后关闭该选项。插件会串行处理请求并有限重试，同一事件不会重复执行。
 
-## 部署示例与检查
+## 开发检查
 
-实例位于 `/srv/nomi-bot`，归 `mcadmin:mcadmin`；`.env` 和 `.env.prod` 权限为 0600，后端地址为 `http://127.0.0.1:8000`。`deploy/bot.service` 使用实例的 `bot.py`，管理开机自启和失败重启。
-
-在插件目录执行 `uv sync --python 3.12`、`uv run pytest -q`、`uv run ruff check src tests`。父实例的配置、机器人密钥和虚拟环境不属于本仓库。
+```text
+uv sync --python 3.12
+uv run pytest -q
+uv run ruff check src tests
+```

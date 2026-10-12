@@ -3,8 +3,8 @@ Description=Nomi QQ NoneBot
 After=network-online.target nomi-auth.service
 Wants=network-online.target nomi-auth.service
 [Service]
-User=mcadmin
-Group=mcadmin
+User=nonebot
+Group=nonebot
 WorkingDirectory=/srv/nomi-bot
 ExecStart=/srv/nomi-bot/.venv/bin/python /srv/nomi-bot/bot.py
 Restart=on-failure
