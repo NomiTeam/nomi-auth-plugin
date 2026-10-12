@@ -3,7 +3,7 @@
 from nonebot import get_driver, get_plugin_config, logger, on_command, on_message
 from nonebot.adapters.qq import Bot
 from nonebot.adapters.qq.event import GroupMessageCreateEvent
-from nonebot.adapters.qq.message import Message, MessageSegment
+from nonebot.adapters.qq.message import Message
 from nonebot.params import CommandArg
 from nonebot.plugin import PluginMetadata
 
@@ -71,8 +71,7 @@ async def process(operation, matcher, bot, event, argument):
         await matcher.finish(str(error))
     if result["status"] == "AWAITING_NAME":
         await matcher.finish(
-            MessageSegment.mention_user(event.author.member_openid)
-            + " 你还没有账号，请在验证码到期前发送：注册 <id>。"
+            "你还没有账号，请在验证码到期前发送：注册 <id>。"
             + "ID 为 3 至 16 位字母、数字或下划线；名称冲突会结束本次申请。"
         )
     verb = {"VERIFIED": "登录", "REGISTERED": "注册", "RENAMED": "改名"}[
