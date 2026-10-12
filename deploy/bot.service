@@ -5,8 +5,8 @@ Wants=network-online.target nomi-auth.service
 [Service]
 User=mcadmin
 Group=mcadmin
-WorkingDirectory=/home/naipu/minecraft/nomi-bot
-ExecStart=/home/naipu/minecraft/nomi-bot/.venv/bin/python /home/naipu/minecraft/nomi-bot/bot.py
+WorkingDirectory=/srv/nomi-bot
+ExecStart=/srv/nomi-bot/.venv/bin/python /srv/nomi-bot/bot.py
 Restart=on-failure
 RestartSec=5
 UMask=0077
