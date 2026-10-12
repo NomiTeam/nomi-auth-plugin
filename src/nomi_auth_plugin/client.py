@@ -1,3 +1,11 @@
+'''
+Description: Description
+version: 1.0.0
+Author: Naipu
+Date: 2026-10-12 12:46:16
+LastEditors: Naipu
+LastEditTime: 2026-10-12 14:03:50
+'''
 import asyncio
 
 import httpx
@@ -10,6 +18,8 @@ class BackendError(Exception):
 
 
 MESSAGES = {
+    "ACCOUNT_NOT_FOUND": "你在这个群内还没有账号，请先在启动器注册。",
+    "ACCOUNT_UNAVAILABLE": "该账号已停用，请联系管理员。",
     "IDENTITY_ALREADY_BOUND": "你在这个群内已有账号，请通过群验证码登录。",
     "INVALID_CODE": "验证码无效，请检查后重试。",
     "CODE_USED": "验证码已使用或申请已结束。",
