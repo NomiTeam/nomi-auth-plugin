@@ -72,7 +72,7 @@ async def process(operation, matcher, bot, event, argument):
     if result["status"] == "AWAITING_NAME":
         await matcher.finish(
             "你还没有账号，请在验证码到期前发送：注册 <id>。"
-            + "ID 为 3 至 16 位字母、数字或下划线；名称冲突会结束本次申请。"
+            + "ID 为 3 至 16 位字母、数字或下划线。"
         )
     verb = {"VERIFIED": "登录", "REGISTERED": "注册", "RENAMED": "改名"}[
         result["status"]
