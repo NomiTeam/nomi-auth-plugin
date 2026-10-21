@@ -8,6 +8,7 @@ class Config(BaseModel):
     nomi_allowed_group_openid: str = ""
     nomi_bot_app_id: str = ""
     nomi_discovery: bool = False
+    nomi_total_timeout: float = Field(default=15, gt=0, le=60)
     nomi_http_timeout: float = Field(default=8, gt=0, le=30)
 
     @property

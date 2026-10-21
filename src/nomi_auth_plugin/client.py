@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import asynccontextmanager
 
 import httpx
 
@@ -31,7 +32,8 @@ MESSAGES = {
 class AuthClient:
     def __init__(self, config: Config, transport=None):
         self.config = config
-        self.lock = asyncio.Lock()
+        self.locks = {}
+        self.pending = 0
         self.http = httpx.AsyncClient(
             base_url=config.nomi_auth_base_url.rstrip("/"),
             headers={"Authorization": "Bearer " + config.nomi_bot_api_token},
@@ -59,24 +61,58 @@ class AuthClient:
             "注册": "/internal/v1/logins/register",
             "改名": "/internal/v1/profiles/rename",
         }[operation]
-        # A single FIFO lock keeps submissions ordered, including retries.
-        async with self.lock:
-            for attempt in range(3):
-                try:
-                    response = await self.http.post(path, json=payload)
-                    if response.status_code >= 500:
-                        raise httpx.TransportError("backend unavailable")
-                    data = response.json()
-                    if response.is_error or data.get("status") == "FAILED":
-                        raise BackendError(
-                            MESSAGES.get(
-                                data.get("code"), "验证失败，请检查配置或在启动器重试。"
-                            )
-                        )
-                    return data
-                except (httpx.TransportError, ValueError):
-                    if attempt == 2:
-                        raise BackendError(
-                            "账号服务暂时不可用。请查看启动器状态，稍后使用同一码重试。"
-                        )
-                    await asyncio.sleep(0.5 * (attempt + 1))
+        if self.pending >= 64:
+            raise BackendError("当前验证请求较多，请稍后使用同一码重试。")
+        self.pending += 1
+        try:
+            async with asyncio.timeout(self.config.nomi_total_timeout):
+                # Keep each member's commands ordered; the same code still has a single FIFO claimant queue.
+                async with (
+                    self.ordered(("member", group, member)),
+                    self.ordered(("code", code.upper()) if operation == "登录" else ("operation", group, member)),
+                ):
+                    return await self.send(path, payload, operation)
+        except TimeoutError:
+            raise BackendError("验证等待超时。请查看启动器状态，稍后使用同一码重试。") from None
+        finally:
+            self.pending -= 1
+
+    @asynccontextmanager
+    async def ordered(self, key):
+        lock, count = self.locks.get(key, (asyncio.Lock(), 0))
+        self.locks[key] = (lock, count + 1)
+        try:
+            async with lock:
+                yield
+        finally:
+            _, count = self.locks[key]
+            if count == 1:
+                del self.locks[key]
+            else:
+                self.locks[key] = (lock, count - 1)
+
+    async def send(self, path, payload, operation):
+        for attempt in range(3):
+            try:
+                response = await self.http.post(path, json=payload)
+                if response.status_code >= 500:
+                    raise httpx.TransportError("backend unavailable")
+                data = response.json()
+                if not isinstance(data, dict):
+                    raise TypeError("invalid response shape")
+                if "code" in data and not isinstance(data["code"], str):
+                    raise ValueError("invalid response fields")
+                if response.is_error or data.get("status") == "FAILED":
+                    raise BackendError(MESSAGES.get(data.get("code"), "验证失败，请检查配置或在启动器重试。"))
+                statuses = {"登录": {"AWAITING_NAME", "VERIFIED"}, "注册": {"REGISTERED"}, "改名": {"RENAMED"}}
+                if not isinstance(data.get("status"), str) or data["status"] not in statuses[operation]:
+                    raise ValueError("invalid response status")
+                if data["status"] != "AWAITING_NAME" and (
+                    not isinstance(data.get("name"), str) or not data["name"]
+                ):
+                    raise ValueError("missing profile name")
+                return data
+            except (httpx.TransportError, ValueError, TypeError):
+                if attempt == 2:
+                    raise BackendError("账号服务暂时不可用。请查看启动器状态，稍后使用同一码重试。") from None
+                await asyncio.sleep(0.5 * (attempt + 1))

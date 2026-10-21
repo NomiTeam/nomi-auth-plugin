@@ -22,7 +22,7 @@ Linux 使用 `.venv/bin/python`。在实例入口调用 `nonebot.load_plugin("no
 
 将 `.env.example` 的字段加入实例配置，应用 ID、群 OpenID 和内部服务凭证须与后端匹配。无前缀命令需设置 `COMMAND_START=["", "/"]`。缺少配置时业务命令禁用。
 
-需要获取群 ID 时临时启用 `NOMI_DISCOVERY=true`，在目标群发送 `Nomi群信息`；从本地日志读取应用和群 ID 后关闭该选项。插件会串行处理请求并有限重试，同一事件不会重复执行。
+需要获取群 ID 时临时启用 `NOMI_DISCOVERY=true`，在目标群发送 `Nomi群信息`；从本地日志读取应用和群 ID 后关闭该选项。同一成员和同一码的请求按顺序处理，无关申请可并行。请求有限重试，总等待默认最多 15 秒（`NOMI_TOTAL_TIMEOUT`），同一事件不会重复执行。
 
 ## 开发检查
 
