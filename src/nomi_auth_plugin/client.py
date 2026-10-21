@@ -67,10 +67,10 @@ class AuthClient:
         try:
             async with asyncio.timeout(self.config.nomi_total_timeout):
                 # Keep each member's commands ordered; the same code still has a single FIFO claimant queue.
-                async with (
-                    self.ordered(("member", group, member)),
-                    self.ordered(("code", code.upper()) if operation == "登录" else ("operation", group, member)),
-                ):
+                keys = [("member", group, member)]
+                if operation == "登录":
+                    keys.append(("code", code.replace("-", "").strip().upper()))
+                async with self.ordered(keys):
                     return await self.send(path, payload, operation)
         except TimeoutError:
             raise BackendError("验证等待超时。请查看启动器状态，稍后使用同一码重试。") from None
@@ -78,18 +78,27 @@ class AuthClient:
             self.pending -= 1
 
     @asynccontextmanager
-    async def ordered(self, key):
-        lock, count = self.locks.get(key, (asyncio.Lock(), 0))
-        self.locks[key] = (lock, count + 1)
+    async def ordered(self, keys):
+        # Reserve all queues before waiting: earlier messages cannot be overtaken on either resource.
+        predecessors = {self.locks[key] for key in keys if key in self.locks}
+        finished = asyncio.get_running_loop().create_future()
+        for key in keys:
+            self.locks[key] = finished
+        ready = asyncio.gather(*(asyncio.shield(previous) for previous in predecessors))
         try:
-            async with lock:
-                yield
+            await asyncio.shield(ready)
+            yield
         finally:
-            _, count = self.locks[key]
-            if count == 1:
-                del self.locks[key]
+            def release(_=None):
+                finished.set_result(None)
+                for key in keys:
+                    if self.locks.get(key) is finished:
+                        del self.locks[key]
+            # A cancelled waiter must not let successors bypass a still-running predecessor.
+            if ready.done():
+                release()
             else:
-                self.locks[key] = (lock, count - 1)
+                ready.add_done_callback(release)
 
     async def send(self, path, payload, operation):
         for attempt in range(3):

@@ -61,7 +61,7 @@ async def test_same_code_preserves_claim_order_and_cancelled_waiter_releases_loc
     client = isolated_client(handler)
     first = asyncio.create_task(client.submit("登录", "SAME", "group", "one", "1"))
     await asyncio.wait_for(entered.wait(), 1)
-    second = asyncio.create_task(client.submit("登录", "same", "group", "two", "2"))
+    second = asyncio.create_task(client.submit("登录", "s-a-m-e", "group", "two", "2"))
     await asyncio.sleep(0)
     cancelled = asyncio.create_task(client.submit("登录", "SAME", "group", "three", "3"))
     await asyncio.sleep(0)
@@ -71,6 +71,7 @@ async def test_same_code_preserves_claim_order_and_cancelled_waiter_releases_loc
     assert seen == ["one"]
     release.set()
     await asyncio.gather(first, second)
+    await asyncio.wait_for(asyncio.gather(*set(client.locks.values())), 1)
     assert seen == ["one", "two"] and not client.locks and client.pending == 0
     await client.close()
 
@@ -87,6 +88,41 @@ async def test_total_deadline_releases_locks():
         assert not client.locks and client.pending == 0
     finally:
         await client.close()
+
+
+@pytest.mark.asyncio
+async def test_earlier_claim_waiting_for_member_cannot_be_overtaken():
+    entered, release = asyncio.Event(), asyncio.Event()
+    seen = []
+
+    async def handler(request):
+        import json
+        payload = json.loads(request.content)
+        seen.append(payload["event_id"])
+        if payload["event_id"] == "rename":
+            entered.set()
+            await release.wait()
+        status = "RENAMED" if payload["event_id"] == "rename" else "VERIFIED"
+        return httpx.Response(200, json={"status": status, "name": "Alice"})
+
+    client = isolated_client(handler)
+    rename = asyncio.create_task(client.submit("改名", "Alice", "group", "one", "rename"))
+    await asyncio.wait_for(entered.wait(), 1)
+    earlier = asyncio.create_task(client.submit("登录", "CODE", "group", "one", "earlier"))
+    await asyncio.sleep(0)
+    cancelled = asyncio.create_task(client.submit("登录", "CODE", "group", "two", "cancelled"))
+    await asyncio.sleep(0)
+    cancelled.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await cancelled
+    later = asyncio.create_task(client.submit("登录", "C-O-D-E", "group", "three", "later"))
+    await asyncio.sleep(0)
+    assert seen == ["rename"]
+    release.set()
+    await asyncio.gather(rename, earlier, later)
+    assert seen == ["rename", "earlier", "later"]
+    assert not client.locks and client.pending == 0
+    await client.close()
 
 
 @pytest.mark.asyncio
