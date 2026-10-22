@@ -15,7 +15,7 @@ MESSAGES = {
     "REQUEST_IN_PROGRESS": "你已有待注册申请，请先完成或关闭启动器窗口。",
     "INVALID_NAME": "ID 须为 3 至 16 位字母、数字或下划线，本次请求已关闭。",
     "INVALID_REQUEST": "请求格式无效，请重新申请。",
-    "RENAME_COOLDOWN": "尚在 7 天改名冷却期，本次请求已关闭。",
+    "RENAME_COOLDOWN": "尚在改名冷却期，本次请求已关闭。",
     "ACCOUNT_NOT_FOUND": "你在这个群内还没有账号，请先发送启动器的登录码。",
     "ACCOUNT_UNAVAILABLE": "该账号已停用，请联系管理员。",
     "IDENTITY_ALREADY_BOUND": "你在这个群内已有账号，请通过群验证码登录。",

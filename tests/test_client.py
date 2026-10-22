@@ -228,6 +228,17 @@ async def test_conflict_closes_and_does_not_retry():
 
 
 @pytest.mark.asyncio
+async def test_cooldown_reply_does_not_assume_backend_duration():
+    client = isolated_client(lambda request: httpx.Response(200, json={"status": "FAILED", "code": "RENAME_COOLDOWN"}))
+    try:
+        with pytest.raises(client_module.BackendError, match="改名冷却期") as error:
+            await client.submit("改名", "Alice", "group", "member", "event")
+        assert "7 天" not in str(error.value)
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "operation,status,reply",
     [
