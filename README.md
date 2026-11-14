@@ -1,33 +1,65 @@
 # Nomi Auth Plugin
 
-现有 NoneBot 实例中的 QQ 官方适配器插件，只处理指定群，通过 [Nomi Auth](https://github.com/NomiTeam/nomi-auth) 完成无密码登录、注册和改名。
+这是一个 NoneBot 插件，使用 QQ 官方适配器接收指定群的消息，再调用 [Nomi Auth](https://github.com/NomiTeam/nomi-auth) 完成无密码登录、注册和改名。插件不直接访问数据库。
 
 ## 命令
 
-- `登录 验证码`：验证码由启动器提供；没有账号时提示继续注册。
-- `注册 ID`：仅认领申请的成员可使用。ID 为 3 至 16 位字母、数字或下划线。
-- `改名 新ID`：修改本人游戏名，默认冷却 7 天，UUID 不变。
+| 命令 | 说明 | 示例 |
+| --- | --- | --- |
+| `登录 验证码` | 发送启动器提供的验证码 | `登录 AAAA-BBBB-CCCC` |
+| `注册 ID` | 没有账号时，按提示为已认领的申请选择 ID | `注册 Alice` |
+| `改名 新ID` | 修改本人的游戏名，UUID 不变 | `改名 NewAlice` |
 
-成功回复显示当前 ID，不发送令牌，不艾特成员。是否需要艾特机器人取决于群消息权限。
+ID 为 3–16 位字母、数字或下划线。改名默认冷却 7 天，以后端配置为准。成功回复显示当前 ID，不发送令牌，也不艾特成员。是否需要艾特机器人，取决于 QQ 的群消息权限。
 
-## 安装与配置
+## 安装
 
-在机器人实例目录执行（Windows 路径示例）：
+需要已有的 NoneBot 实例和 QQ 官方适配器。在机器人目录执行：
 
-```text
-uv pip install --python .venv/Scripts/python.exe -e ./nomi-auth-plugin
+```shell
+uv pip install --python .venv/bin/python -e ./nomi-auth-plugin
 ```
 
-Linux 使用 `.venv/bin/python`。在实例入口调用 `nonebot.load_plugin("nomi_auth_plugin")`，或通过 pyproject.toml 加载，二选一。
+Windows 将 Python 路径改为 `.venv/Scripts/python.exe`。
 
-将 `.env.example` 的字段加入实例配置，应用 ID、群 OpenID 和内部服务凭证须与后端匹配。无前缀命令需设置 `COMMAND_START=["", "/"]`。缺少配置时业务命令禁用。
+在实例入口加入 `nonebot.load_plugin("nomi_auth_plugin")`，或在实例的 `pyproject.toml` 中加载，选择一种即可。
 
-需要获取群 ID 时临时启用 `NOMI_DISCOVERY=true`，在目标群发送 `Nomi群信息`；从本地日志读取应用和群 ID 后关闭该选项。同一成员和同一码的请求按顺序处理，无关申请可并行。请求有限重试，总等待默认最多 15 秒（`NOMI_TOTAL_TIMEOUT`），同一事件不会重复执行。
+## 配置
+
+将 `.env.example` 的字段加入机器人现有配置。应用 ID、群 OpenID 和服务凭证必须与后端一致。无前缀命令需要 `COMMAND_START=["", "/"]`；缺少必要配置时业务命令禁用。
+
+需要获取群 ID 时，临时设置 `NOMI_DISCOVERY=true`，在目标群发送 `Nomi群信息`，从机器人日志读取应用和群 ID，完成后关闭该选项。
+
+请求总等待默认 15 秒，每次 HTTP 请求默认最多 8 秒，包含有限重试。相同事件重试会保留原事件 ID，后端不会重复执行操作。
+
+## 项目结构
+
+```text
+src/nomi_auth_plugin/
+├── __init__.py - 注册命令和关闭回调
+├── commands.py - 群校验、参数检查和回复
+├── client.py   - 后端请求、重试和响应校验
+├── queue.py    - 按成员和验证码维护请求顺序
+├── messages.py - 面向群友的中文提示
+└── config.py   - NoneBot 配置
+```
+
+同一成员的命令按顺序处理，同一个验证码也只有一条认领队列，其他申请可以并行。等待中的消息即使取消，也不能让后来的消息越过它前面仍在运行的请求。
 
 ## 开发检查
 
-```text
+```shell
 uv sync --python 3.12
-uv run pytest -q
 uv run ruff check src tests
+uv run ruff format --check src tests
+uv run pyrefly check
+uv run pytest -q
 ```
+
+普通测试不需要真实 QQ 凭证。若同级目录有 `nomi-auth`，可运行两个项目的联动测试：
+
+```shell
+uv run --with-editable ../nomi-auth pytest -q
+```
+
+联动测试默认检查 SQLite。配置 `NOMI_TEST_MYSQL_DATABASE/USER/PASSWORD` 后也会检查 MariaDB，可选 `NOMI_TEST_MYSQL_HOST/PORT`；测试库名必须以 `nomi_auth_test_` 开头，其中的业务表会被清空。
