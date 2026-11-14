@@ -5,15 +5,15 @@ import nonebot
 import pytest
 
 # Install the sibling auth project explicitly when running cross-project tests.
-auth_app = pytest.importorskip("nomi_auth.app")
+auth_app = pytest.importorskip("src.app")
 
 try:
     nonebot.get_driver()
 except ValueError:
     nonebot.init()
 
-from nomi_auth.config import Settings
-from nomi_auth.transfer import TABLES
+from src.core.config import Settings
+from src.storage.transfer import TABLES
 
 from nomi_auth_plugin.client import AuthClient, BackendError
 from nomi_auth_plugin.config import Config
