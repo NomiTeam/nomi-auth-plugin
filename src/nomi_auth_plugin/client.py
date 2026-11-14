@@ -120,12 +120,13 @@ class AuthClient:
         payload = response.json()
         if not isinstance(payload, dict):
             raise TypeError("Invalid response shape")
-        if "code" in payload and not isinstance(payload["code"], str):
-            raise ValueError("Invalid response fields")
+        error_code = payload.get("code", "")
+        if not isinstance(error_code, str):
+            raise TypeError("Invalid response fields")
 
         if response.is_error or payload.get("status") == "FAILED":
             message = ERROR_MESSAGES.get(
-                payload.get("code"), "验证失败，请检查配置或在启动器重试。"
+                error_code, "验证失败，请检查配置或在启动器重试。"
             )
             raise BackendError(message)
 

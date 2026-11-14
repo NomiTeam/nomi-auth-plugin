@@ -1,5 +1,5 @@
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 QueueKey = tuple[str, ...]
@@ -14,7 +14,7 @@ class CommandQueue:
         self.tails: dict[QueueKey, asyncio.Future[None]] = {}
 
     @asynccontextmanager
-    async def wait(self, keys: list[QueueKey]) -> AsyncIterator[None]:
+    async def wait(self, keys: list[QueueKey]) -> AsyncGenerator[None, None]:
         # Reserve every queue before waiting, so a later claimant cannot overtake.
         predecessors = {self.tails[key] for key in keys if key in self.tails}
         finished: asyncio.Future[None] = asyncio.get_running_loop().create_future()
