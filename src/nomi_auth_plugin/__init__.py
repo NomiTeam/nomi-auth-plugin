@@ -13,7 +13,7 @@ from .config import Config
 __plugin_meta__ = PluginMetadata(
     name="Nomi 账号验证",
     description="群验证码登录，未注册成员在群内选择账号 ID",
-    usage="登录 <验证码>；按提示注册 <id>；改名 <新id>",
+    usage="登录 验证码；按提示注册 ID；改名 新ID",
     config=Config,
     supported_adapters={"~qq"},
 )
@@ -59,7 +59,7 @@ async def process(operation, matcher, bot, event, argument):
     if operation == "登录" and (
         not value or len(value) > 64 or len(value.split()) != 1
     ):
-        await matcher.finish("用法：登录 <启动器显示的验证码>")
+        await matcher.finish("用法：登录 启动器显示的验证码")
     if operation != "登录" and len(value) > 64:
         # Send a short invalid value to end a pending registration atomically.
         value = "!"
@@ -71,7 +71,7 @@ async def process(operation, matcher, bot, event, argument):
         await matcher.finish(str(error))
     if result["status"] == "AWAITING_NAME":
         await matcher.finish(
-            "你还没有账号，请在验证码到期前发送：注册 <id>。"
+            "你还没有账号，请在验证码到期前发送：注册 ID。"
             + "ID 为 3 至 16 位字母、数字或下划线。"
         )
     verb = {"VERIFIED": "登录", "REGISTERED": "注册", "RENAMED": "改名"}[

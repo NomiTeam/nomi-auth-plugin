@@ -242,7 +242,7 @@ async def test_cooldown_reply_does_not_assume_backend_duration():
 @pytest.mark.parametrize(
     "operation,status,reply",
     [
-        ("登录", "AWAITING_NAME", "注册 <id>"),
+        ("登录", "AWAITING_NAME", "注册 ID"),
         ("登录", "VERIFIED", "登录成功，账号 ID：Alice"),
         ("注册", "REGISTERED", "注册成功，账号 ID：Alice"),
         ("改名", "RENAMED", "改名成功，账号 ID：Alice"),
@@ -283,4 +283,5 @@ async def test_plain_group_replies_include_account_id(
             event,
             Message("value"),
         )
-    assert reply in replies[0] and "<@" not in replies[0]
+    assert reply in replies[0]
+    assert "<" not in replies[0] and ">" not in replies[0]
