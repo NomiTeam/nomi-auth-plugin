@@ -11,7 +11,24 @@ permissions:
   contents: read
 
 jobs:
+  build-neo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: NomiTeam/nomi-auth-neo
+          ref: 9e8a112cec1bc6f79f40dd6c339e379e98fc77cd
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release --locked
+      - uses: actions/upload-artifact@v4
+        with:
+          name: neo-integration-binary
+          path: target/release/nomi-auth-neo
+          retention-days: 1
+
   check:
+    needs: build-neo
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -31,17 +48,18 @@ jobs:
           --health-cmd="healthcheck.sh --connect --innodb_initialized"
           --health-interval=10s --health-timeout=5s --health-retries=10
     env:
+      NOMI_TEST_NEO_BINARY: ${{ github.workspace }}/.reference/neo-bin/nomi-auth-neo
       NOMI_TEST_MYSQL_DATABASE: nomi_auth_test_plugin_ci
       NOMI_TEST_MYSQL_USER: nomi_auth_test_user
       NOMI_TEST_MYSQL_PASSWORD: test-only-password
       NOMI_TEST_MYSQL_HOST: 127.0.0.1
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
-          repository: NomiTeam/nomi-auth
-          ref: 8110ee46c0ebc49013790e7cb30204f0df1acb7e
-          path: .reference/nomi-auth
+          name: neo-integration-binary
+          path: .reference/neo-bin
+      - run: chmod +x .reference/neo-bin/nomi-auth-neo
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.python }}
@@ -51,4 +69,4 @@ jobs:
       - run: uv run ruff check src tests
       - run: uv run ruff format --check src tests
       - run: uv run pyrefly check
-      - run: uv run --with-editable .reference/nomi-auth pytest -q
+      - run: uv run pytest -q
