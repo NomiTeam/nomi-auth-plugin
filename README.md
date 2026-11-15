@@ -1,6 +1,6 @@
 # Nomi Auth Plugin
 
-这是一个 NoneBot 插件，使用 QQ 官方适配器接收指定群的消息，再调用 [Nomi Auth](https://github.com/NomiTeam/nomi-auth) 或 [Nomi Auth Neo](https://github.com/NomiTeam/nomi-auth-neo) 完成无密码登录、注册和改名。插件不直接访问数据库。
+这是一个 NoneBot 插件，使用 QQ 官方适配器接收指定群的消息，再调用 [Nomi Auth Neo](https://github.com/NomiTeam/nomi-auth-neo) 完成无密码登录、注册和改名。插件不直接访问数据库。
 
 ## 命令
 
@@ -42,7 +42,7 @@ NOMI_TLS_CA_CERT=/path/to/server-ca.pem
 
 `NOMI_TLS_CA_CERT` 可留空，使用系统信任链。客户端证书可包含中间证书链。插件始终校验服务端证书和主机名，不跟随重定向；证书文件无效时启动失败。显式配置 TLS 证书后，连接错误不会自动重试，避免重复尝试错误的证书；服务端临时错误仍按原规则重试。
 
-公网部署的双入口配置见 [mTLS 说明](https://github.com/NomiTeam/nomi-auth-neo/blob/main/deploy/MTLS.md)。
+公网部署的同域名、同端口配置见 [mTLS 说明](https://github.com/NomiTeam/nomi-auth-neo/blob/main/README.md#nginx)。
 
 ## 项目结构
 
@@ -69,10 +69,12 @@ uv run pyrefly check
 uv run pytest -q
 ```
 
-普通测试不需要真实 QQ 凭证。若同级目录有 `nomi-auth`，可运行两个项目的联动测试：
+普通测试不需要真实 QQ 凭证。联动测试只使用 Nomi Auth Neo 的实际可执行文件，不加载旧 Python 服务：
 
 ```shell
-uv run --with-editable ../nomi-auth pytest -q
+NOMI_TEST_NEO_BINARY=/path/to/nomi-auth-neo uv run pytest -q
 ```
 
-联动测试默认检查 SQLite。配置 `NOMI_TEST_MYSQL_DATABASE/USER/PASSWORD` 后也会检查 MariaDB，可选 `NOMI_TEST_MYSQL_HOST/PORT`；测试库名必须以 `nomi_auth_test_` 开头，其中的业务表会被清空。
+Windows 通过 `$env:NOMI_TEST_NEO_BINARY` 设置 exe 路径。未设置时明确跳过联动测试。
+
+联动测试默认检查 SQLite。配置 `NOMI_TEST_MYSQL_DATABASE/USER/PASSWORD` 后也会检查 MariaDB，可选 `NOMI_TEST_MYSQL_HOST/PORT`；库名必须以 `nomi_auth_test_` 开头。测试使用随机应用标识和账号名，不清空数据库，测试库应单独保留或删除。

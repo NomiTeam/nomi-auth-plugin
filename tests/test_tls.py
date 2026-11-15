@@ -15,7 +15,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 from pydantic import ValidationError
 
-nonebot.init()
+nonebot.init(driver="~none")
 Config = importlib.import_module("nomi_auth_plugin.config").Config
 AuthClient = importlib.import_module("nomi_auth_plugin.client").AuthClient
 BackendError = importlib.import_module("nomi_auth_plugin.errors").BackendError

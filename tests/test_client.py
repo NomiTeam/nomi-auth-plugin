@@ -6,6 +6,7 @@ import nonebot
 import pytest
 
 nonebot.init(
+    driver="~none",
     nomi_bot_api_token="x" * 32,
     nomi_allowed_group_openid="group",
     nomi_bot_app_id="app",
