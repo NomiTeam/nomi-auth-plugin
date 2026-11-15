@@ -42,7 +42,7 @@ NOMI_TLS_CA_CERT=/path/to/server-ca.pem
 
 `NOMI_TLS_CA_CERT` 可留空，使用系统信任链。客户端证书可包含中间证书链。插件始终校验服务端证书和主机名，不跟随重定向；证书文件无效时启动失败。显式配置 TLS 证书后，连接错误不会自动重试，避免重复尝试错误的证书；服务端临时错误仍按原规则重试。
 
-公网部署的同域名、同端口配置见 [mTLS 说明](https://github.com/NomiTeam/nomi-auth-neo/blob/main/deploy/MTLS.md)。
+公网部署的同域名、同端口配置见 [mTLS 说明](https://github.com/NomiTeam/nomi-auth-neo/blob/main/README.md#nginx)。
 
 ## 项目结构
 
