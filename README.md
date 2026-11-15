@@ -32,7 +32,7 @@ Windows 将 Python 路径改为 `.venv/Scripts/python.exe`。
 
 请求总等待默认 15 秒，每次 HTTP 请求默认最多 8 秒，包含有限重试。相同事件重试会保留原事件 ID，后端不会重复执行操作。
 
-跨机器部署时，将服务地址设为 Nginx 提供的 HTTPS 地址，并填写独立服务密钥。部署配置见 [Nginx 说明](https://github.com/NomiTeam/nomi-auth-neo/blob/main/README.md#nginx)。
+跨机器部署时，建议使用 HTTPS，并填写与认证服务一致的独立服务密钥。
 
 插件使用系统信任链校验服务端证书和主机名，不跟随重定向。自签 CA 可通过 `NOMI_TLS_CA_CERT=/path/to/server-ca.pem` 配置；证书无效时启动失败或直接报告验证错误，网络中断和服务端临时错误进行有限重试。
 
