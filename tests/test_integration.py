@@ -13,7 +13,7 @@ import pytest
 try:
     nonebot.get_driver()
 except ValueError:
-    nonebot.init()
+    nonebot.init(driver="~none")
 
 from nomi_auth_plugin.client import AuthClient, BackendError
 from nomi_auth_plugin.config import Config
