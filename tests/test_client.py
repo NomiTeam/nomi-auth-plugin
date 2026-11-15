@@ -16,7 +16,12 @@ Config = importlib.import_module("nomi_auth_plugin.config").Config
 
 def isolated_client(handler, **options):
     return client_module.AuthClient(
-        Config(nomi_bot_api_token="x" * 32, nomi_allowed_group_openid="group", nomi_bot_app_id="app", **options),
+        Config(
+            nomi_bot_api_token="x" * 32,
+            nomi_allowed_group_openid="group",
+            nomi_bot_app_id="app",
+            **options,
+        ),
         httpx.MockTransport(handler),
     )
 
@@ -27,6 +32,7 @@ async def test_slow_member_does_not_block_unrelated_login():
 
     async def handler(request):
         import json
+
         if json.loads(request.content)["member_openid"] == "slow":
             entered.set()
             await release.wait()
@@ -36,12 +42,14 @@ async def test_slow_member_does_not_block_unrelated_login():
     slow = asyncio.create_task(client.submit("登录", "CODE1", "group", "slow", "first"))
     try:
         await asyncio.wait_for(entered.wait(), 1)
-        fast = await asyncio.wait_for(client.submit("登录", "CODE2", "group", "fast", "second"), 1)
+        fast = await asyncio.wait_for(
+            client.submit("登录", "CODE2", "group", "fast", "second"), 1
+        )
         assert fast["status"] == "VERIFIED" and not slow.done()
     finally:
         release.set()
         await slow
-        assert not client.locks and client.pending == 0
+        assert not client.queue.tails and client.pending == 0
         await client.close()
 
 
@@ -52,6 +60,7 @@ async def test_same_code_preserves_claim_order_and_cancelled_waiter_releases_loc
 
     async def handler(request):
         import json
+
         seen.append(json.loads(request.content)["member_openid"])
         if len(seen) == 1:
             entered.set()
@@ -63,7 +72,9 @@ async def test_same_code_preserves_claim_order_and_cancelled_waiter_releases_loc
     await asyncio.wait_for(entered.wait(), 1)
     second = asyncio.create_task(client.submit("登录", "s-a-m-e", "group", "two", "2"))
     await asyncio.sleep(0)
-    cancelled = asyncio.create_task(client.submit("登录", "SAME", "group", "three", "3"))
+    cancelled = asyncio.create_task(
+        client.submit("登录", "SAME", "group", "three", "3")
+    )
     await asyncio.sleep(0)
     cancelled.cancel()
     with pytest.raises(asyncio.CancelledError):
@@ -71,8 +82,8 @@ async def test_same_code_preserves_claim_order_and_cancelled_waiter_releases_loc
     assert seen == ["one"]
     release.set()
     await asyncio.gather(first, second)
-    await asyncio.wait_for(asyncio.gather(*set(client.locks.values())), 1)
-    assert seen == ["one", "two"] and not client.locks and client.pending == 0
+    await asyncio.wait_for(asyncio.gather(*set(client.queue.tails.values())), 1)
+    assert seen == ["one", "two"] and not client.queue.tails and client.pending == 0
     await client.close()
 
 
@@ -84,8 +95,10 @@ async def test_total_deadline_releases_locks():
     client = isolated_client(handler, nomi_total_timeout=0.05)
     try:
         with pytest.raises(client_module.BackendError, match="超时"):
-            await asyncio.wait_for(client.submit("登录", "CODE", "group", "one", "1"), 1)
-        assert not client.locks and client.pending == 0
+            await asyncio.wait_for(
+                client.submit("登录", "CODE", "group", "one", "1"), 1
+            )
+        assert not client.queue.tails and client.pending == 0
     finally:
         await client.close()
 
@@ -97,6 +110,7 @@ async def test_earlier_claim_waiting_for_member_cannot_be_overtaken():
 
     async def handler(request):
         import json
+
         payload = json.loads(request.content)
         seen.append(payload["event_id"])
         if payload["event_id"] == "rename":
@@ -106,27 +120,37 @@ async def test_earlier_claim_waiting_for_member_cannot_be_overtaken():
         return httpx.Response(200, json={"status": status, "name": "Alice"})
 
     client = isolated_client(handler)
-    rename = asyncio.create_task(client.submit("改名", "Alice", "group", "one", "rename"))
+    rename = asyncio.create_task(
+        client.submit("改名", "Alice", "group", "one", "rename")
+    )
     await asyncio.wait_for(entered.wait(), 1)
-    earlier = asyncio.create_task(client.submit("登录", "CODE", "group", "one", "earlier"))
+    earlier = asyncio.create_task(
+        client.submit("登录", "CODE", "group", "one", "earlier")
+    )
     await asyncio.sleep(0)
-    cancelled = asyncio.create_task(client.submit("登录", "CODE", "group", "two", "cancelled"))
+    cancelled = asyncio.create_task(
+        client.submit("登录", "CODE", "group", "two", "cancelled")
+    )
     await asyncio.sleep(0)
     cancelled.cancel()
     with pytest.raises(asyncio.CancelledError):
         await cancelled
-    later = asyncio.create_task(client.submit("登录", "C-O-D-E", "group", "three", "later"))
+    later = asyncio.create_task(
+        client.submit("登录", "C-O-D-E", "group", "three", "later")
+    )
     await asyncio.sleep(0)
     assert seen == ["rename"]
     release.set()
     await asyncio.gather(rename, earlier, later)
     assert seen == ["rename", "earlier", "later"]
-    assert not client.locks and client.pending == 0
+    assert not client.queue.tails and client.pending == 0
     await client.close()
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("data", [[], {}, {"status": "UNEXPECTED"}, {"status": "VERIFIED"}])
+@pytest.mark.parametrize(
+    "data", [[], {}, {"status": "UNEXPECTED"}, {"status": "VERIFIED"}]
+)
 async def test_malformed_success_response_becomes_safe_reply(data, monkeypatch):
     async def no_wait(seconds):
         return
@@ -147,7 +171,8 @@ async def test_retry_preserves_event_and_payload():
     def handler(request):
         payloads.append(request.content)
         return httpx.Response(
-            503 if len(payloads) == 1 else 200, json={"status": "REGISTERED", "name": "Alice"}
+            503 if len(payloads) == 1 else 200,
+            json={"status": "REGISTERED", "name": "Alice"},
         )
 
     client = client_module.AuthClient(
@@ -185,7 +210,15 @@ async def test_operation_routing(operation, path, key):
 
     def handler(request):
         seen.append(request)
-        return httpx.Response(200, json={"status": {"登录": "VERIFIED", "注册": "REGISTERED", "改名": "RENAMED"}[operation], "name": "Alice"})
+        return httpx.Response(
+            200,
+            json={
+                "status": {"登录": "VERIFIED", "注册": "REGISTERED", "改名": "RENAMED"}[
+                    operation
+                ],
+                "name": "Alice",
+            },
+        )
 
     config = Config(
         nomi_bot_api_token="x" * 32,
@@ -229,7 +262,11 @@ async def test_conflict_closes_and_does_not_retry():
 
 @pytest.mark.asyncio
 async def test_cooldown_reply_does_not_assume_backend_duration():
-    client = isolated_client(lambda request: httpx.Response(200, json={"status": "FAILED", "code": "RENAME_COOLDOWN"}))
+    client = isolated_client(
+        lambda request: httpx.Response(
+            200, json={"status": "FAILED", "code": "RENAME_COOLDOWN"}
+        )
+    )
     try:
         with pytest.raises(client_module.BackendError, match="改名冷却期") as error:
             await client.submit("改名", "Alice", "group", "member", "event")
@@ -242,7 +279,7 @@ async def test_cooldown_reply_does_not_assume_backend_duration():
 @pytest.mark.parametrize(
     "operation,status,reply",
     [
-        ("登录", "AWAITING_NAME", "注册 <id>"),
+        ("登录", "AWAITING_NAME", "注册 ID"),
         ("登录", "VERIFIED", "登录成功，账号 ID：Alice"),
         ("注册", "REGISTERED", "注册成功，账号 ID：Alice"),
         ("改名", "RENAMED", "改名成功，账号 ID：Alice"),
@@ -276,11 +313,63 @@ async def test_plain_group_replies_include_account_id(
         group_openid="group", author=SimpleNamespace(member_openid="member"), id="event"
     )
     with pytest.raises(Finished):
-        await plugin.process(
+        await plugin.commands.process(
             operation,
             Matcher(),
             SimpleNamespace(self_id="app"),
             event,
             Message("value"),
         )
-    assert reply in replies[0] and "<@" not in replies[0]
+    assert reply in replies[0]
+    assert "<" not in replies[0] and ">" not in replies[0]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("argument", ["", "two codes", "x" * 65])
+async def test_invalid_login_argument_is_explained_without_contacting_backend(
+    monkeypatch, argument
+):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from nonebot.adapters.qq.message import Message
+
+    plugin = importlib.import_module("nomi_auth_plugin")
+    submit = AsyncMock()
+    monkeypatch.setattr(plugin.backend, "submit", submit)
+    replies = []
+
+    class Finished(Exception):
+        pass
+
+    class Matcher:
+        async def finish(self, message):
+            replies.append(message)
+            raise Finished()
+
+    event = SimpleNamespace(
+        group_openid="group", author=SimpleNamespace(member_openid="member"), id="event"
+    )
+    with pytest.raises(Finished):
+        await plugin.commands.process(
+            "登录", Matcher(), SimpleNamespace(self_id="app"), event, Message(argument)
+        )
+    assert replies == ["用法：登录 启动器显示的验证码"]
+    submit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_unrelated_group_command_is_ignored(monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from nonebot.adapters.qq.message import Message
+
+    plugin = importlib.import_module("nomi_auth_plugin")
+    submit = AsyncMock()
+    monkeypatch.setattr(plugin.backend, "submit", submit)
+    event = SimpleNamespace(group_openid="other")
+    await plugin.commands.process(
+        "登录", AsyncMock(), SimpleNamespace(self_id="app"), event, Message("CODE")
+    )
+    submit.assert_not_awaited()

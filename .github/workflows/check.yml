@@ -1,0 +1,54 @@
+name: Check
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        python: ['3.12', '3.13']
+    services:
+      mariadb:
+        image: mariadb:11
+        env:
+          MARIADB_ROOT_PASSWORD: test-only-root
+          MARIADB_DATABASE: nomi_auth_test_plugin_ci
+          MARIADB_USER: nomi_auth_test_user
+          MARIADB_PASSWORD: test-only-password
+        ports:
+          - 3306/tcp
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    env:
+      NOMI_TEST_MYSQL_DATABASE: nomi_auth_test_plugin_ci
+      NOMI_TEST_MYSQL_USER: nomi_auth_test_user
+      NOMI_TEST_MYSQL_PASSWORD: test-only-password
+      NOMI_TEST_MYSQL_HOST: 127.0.0.1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: NomiTeam/nomi-auth
+          ref: 8110ee46c0ebc49013790e7cb30204f0df1acb7e
+          path: .reference/nomi-auth
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Configure isolated database port
+        run: echo "NOMI_TEST_MYSQL_PORT=${{ job.services.mariadb.ports[3306] }}" >> "$GITHUB_ENV"
+      - run: uv sync --frozen
+      - run: uv run ruff check src tests
+      - run: uv run ruff format --check src tests
+      - run: uv run pyrefly check
+      - run: uv run --with-editable .reference/nomi-auth pytest -q

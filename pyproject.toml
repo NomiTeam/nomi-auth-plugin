@@ -7,7 +7,9 @@ dependencies = ["nonebot2>=2.5,<3", "nonebot-adapter-qq>=1.7.3,<2", "httpx>=0.28
 
 [dependency-groups]
 dev = [
+    "cryptography>=48.0.1",
     "fastapi>=0.143.0",
+    "pyrefly>=1.4.1",
     "pytest>=8",
     "pytest-asyncio>=0.24",
     "ruff>=0.11",
@@ -27,3 +29,11 @@ testpaths = ["tests"]
 
 [tool.ruff.lint]
 extend-ignore = ["B008"]
+
+[tool.pyrefly]
+project-includes = ["src/**/*.py"]
+search-path = ["src"]
+python-version = "3.12"
+
+[tool.ruff]
+line-length = 88
