@@ -72,6 +72,8 @@ def service(request, tmp_path):
         listener.bind(("127.0.0.1", 0))
         port = listener.getsockname()[1]
     url = f"http://127.0.0.1:{port}"
+    # Configuration is supplied by the test environment rather than initial setup.
+    (tmp_path / ".env").write_text("", encoding="utf-8")
     suffix = uuid.uuid4().hex[:10]
     with (tmp_path / "service.log").open("wb") as log:
         process = subprocess.Popen(
