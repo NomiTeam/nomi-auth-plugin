@@ -1,4 +1,5 @@
 import asyncio
+import ssl
 from typing import Any
 
 import httpx
@@ -7,6 +8,7 @@ from .config import Config
 from .errors import BackendError
 from .messages import ERROR_MESSAGES
 from .queue import CommandQueue, QueueKey
+from .tls import create_context, is_certificate_error
 
 PATHS = {
     "登录": "/internal/v1/logins/verify",
@@ -18,6 +20,10 @@ STATUSES = {
     "注册": {"REGISTERED"},
     "改名": {"RENAMED"},
 }
+
+
+class BackendUnavailable(Exception):
+    pass
 
 
 class AuthClient:
@@ -36,6 +42,8 @@ class AuthClient:
             headers={"Authorization": "Bearer " + config.nomi_bot_api_token},
             timeout=config.nomi_http_timeout,
             transport=transport,
+            verify=create_context(config),
+            follow_redirects=False,
         )
 
     async def close(self) -> None:
@@ -101,11 +109,29 @@ class AuthClient:
         for attempt in range(3):
             try:
                 response = await self.http.post(PATHS[operation], json=payload)
+                if response.is_redirect:
+                    raise BackendError("账号服务返回了重定向，请检查服务地址。")
                 if response.status_code >= 500:
-                    raise httpx.TransportError("Backend unavailable")
+                    raise BackendUnavailable("Backend unavailable")
 
                 return self._read_response(operation, response)
-            except (httpx.TransportError, ValueError, TypeError):
+            except (
+                httpx.TransportError,
+                ssl.SSLError,
+                BackendUnavailable,
+                ValueError,
+                TypeError,
+            ) as error:
+                if is_certificate_error(error):
+                    raise BackendError(
+                        "账号服务 TLS 验证失败，请联系管理员检查证书配置。"
+                    ) from None
+                if self.config.tls_configured and isinstance(
+                    error, httpx.TransportError
+                ):
+                    raise BackendError(
+                        "账号服务安全连接失败，请稍后重试或联系管理员。"
+                    ) from None
                 if attempt == 2:
                     raise BackendError(
                         "账号服务暂时不可用。请查看启动器状态，稍后使用同一码重试。"
