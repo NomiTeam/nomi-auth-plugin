@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: NomiTeam/nomi-auth-neo
-          ref: 06c22f5d6a3066d166e33b5b44c9bf0d9c7e8e07
+          ref: 60cd923dfedcb45dc9abb8ccfa8c842428b973eb
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --release --locked
       - uses: actions/upload-artifact@v4

@@ -126,12 +126,6 @@ class AuthClient:
                     raise BackendError(
                         "账号服务 TLS 验证失败，请联系管理员检查证书配置。"
                     ) from None
-                if self.config.tls_configured and isinstance(
-                    error, httpx.TransportError
-                ):
-                    raise BackendError(
-                        "账号服务安全连接失败，请稍后重试或联系管理员。"
-                    ) from None
                 if attempt == 2:
                     raise BackendError(
                         "账号服务暂时不可用。请查看启动器状态，稍后使用同一码重试。"

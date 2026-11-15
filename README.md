@@ -32,17 +32,9 @@ Windows 将 Python 路径改为 `.venv/Scripts/python.exe`。
 
 请求总等待默认 15 秒，每次 HTTP 请求默认最多 8 秒，包含有限重试。相同事件重试会保留原事件 ID，后端不会重复执行操作。
 
-双向 TLS 可通过以下字段配置；证书和私钥必须同时填写，服务地址必须使用 HTTPS：
+跨机器部署时，将服务地址设为 Nginx 提供的 HTTPS 地址，并填写独立服务密钥。部署配置见 [Nginx 说明](https://github.com/NomiTeam/nomi-auth-neo/blob/main/README.md#nginx)。
 
-```dotenv
-NOMI_TLS_CLIENT_CERT=/path/to/client-chain.pem
-NOMI_TLS_CLIENT_KEY=/path/to/client-key.pem
-NOMI_TLS_CA_CERT=/path/to/server-ca.pem
-```
-
-`NOMI_TLS_CA_CERT` 可留空，使用系统信任链。客户端证书可包含中间证书链。插件始终校验服务端证书和主机名，不跟随重定向；证书文件无效时启动失败。显式配置 TLS 证书后，连接错误不会自动重试，避免重复尝试错误的证书；服务端临时错误仍按原规则重试。
-
-公网部署的同域名、同端口配置见 [mTLS 说明](https://github.com/NomiTeam/nomi-auth-neo/blob/main/README.md#nginx)。
+插件使用系统信任链校验服务端证书和主机名，不跟随重定向。自签 CA 可通过 `NOMI_TLS_CA_CERT=/path/to/server-ca.pem` 配置；证书无效时启动失败或直接报告验证错误，网络中断和服务端临时错误进行有限重试。
 
 ## 项目结构
 
@@ -69,7 +61,7 @@ uv run pyrefly check
 uv run pytest -q
 ```
 
-普通测试不需要真实 QQ 凭证。联动测试只使用 Nomi Auth Neo 的实际可执行文件，不加载旧 Python 服务：
+测试使用构造的群事件，联动测试启动 Nomi Auth Neo 的实际可执行文件：
 
 ```shell
 NOMI_TEST_NEO_BINARY=/path/to/nomi-auth-neo uv run pytest -q

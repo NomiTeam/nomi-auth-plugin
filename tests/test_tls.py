@@ -89,7 +89,7 @@ def certificate(directory, name, issuer=None, hostname="localhost", expired=Fals
 def certificates(tmp_path, monkeypatch):
     monkeypatch.setenv("NO_PROXY", "localhost,127.0.0.1")
     ca = certificate(tmp_path, "ca")
-    return ca, certificate(tmp_path, "server", ca), certificate(tmp_path, "client", ca)
+    return ca, certificate(tmp_path, "server", ca)
 
 
 @contextmanager
@@ -112,8 +112,6 @@ def tls_server(ca, server):
     listener = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(server[2], server[3])
-    context.load_verify_locations(ca[2])
-    context.verify_mode = ssl.CERT_REQUIRED
     listener.socket = context.wrap_socket(listener.socket, server_side=True)
     worker = threading.Thread(target=listener.serve_forever, daemon=True)
     worker.start()
@@ -136,22 +134,20 @@ def config(url, **options):
 
 
 @pytest.mark.asyncio
-async def test_real_mutual_tls(certificates):
-    ca, server, client = certificates
+async def test_real_https(certificates):
+    ca, server = certificates
     with tls_server(ca, server) as (url, events):
         auth = AuthClient(
             config(
                 url,
                 nomi_tls_ca_cert=str(ca[2]),
-                nomi_tls_client_cert=str(client[2]),
-                nomi_tls_client_key=str(client[3]),
             )
         )
         try:
             assert (await auth.submit("登录", "code", "group", "member", "event"))[
                 "name"
             ] == "Alice"
-            assert events and events[0]["subject"]
+            assert events == [None]
         finally:
             await auth.close()
 
@@ -159,23 +155,14 @@ async def test_real_mutual_tls(certificates):
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "failure",
-    [
-        "missing_client",
-        "untrusted_server",
-        "hostname",
-        "untrusted_client",
-        "expired_client",
-    ],
+    ["untrusted_server", "hostname", "expired_server"],
 )
 async def test_real_certificate_failure_does_not_retry(
     certificates, monkeypatch, failure, tmp_path
 ):
-    ca, server, client = certificates
-    if failure == "untrusted_client":
-        other_ca = certificate(tmp_path, "other-ca")
-        client = certificate(tmp_path, "untrusted-client", other_ca)
-    if failure == "expired_client":
-        client = certificate(tmp_path, "expired-client", ca, expired=True)
+    ca, server = certificates
+    if failure == "expired_server":
+        server = certificate(tmp_path, "expired-server", ca, expired=True)
     pauses = []
 
     async def sleep(delay):
@@ -184,10 +171,6 @@ async def test_real_certificate_failure_does_not_retry(
     monkeypatch.setattr("nomi_auth_plugin.client.asyncio.sleep", sleep)
     with tls_server(ca, server) as (url, events):
         options = {"nomi_tls_ca_cert": str(ca[2])}
-        if failure != "missing_client":
-            options.update(
-                nomi_tls_client_cert=str(client[2]), nomi_tls_client_key=str(client[3])
-            )
         if failure == "untrusted_server":
             options.pop("nomi_tls_ca_cert")
         if failure == "hostname":
@@ -202,18 +185,9 @@ async def test_real_certificate_failure_does_not_retry(
             await auth.close()
 
 
-@pytest.mark.parametrize(
-    "options",
-    [
-        {"nomi_tls_client_cert": "cert"},
-        {"nomi_tls_client_key": "key"},
-        {"nomi_tls_ca_cert": "ca"},
-        {"nomi_tls_client_cert": "cert", "nomi_tls_client_key": "key"},
-    ],
-)
-def test_tls_configuration_requires_pair_and_https(options):
+def test_custom_ca_requires_https():
     with pytest.raises(ValidationError):
-        config("http://localhost", **options)
+        config("http://localhost", nomi_tls_ca_cert="ca")
 
 
 def test_invalid_certificate_fails_before_requests(tmp_path):
@@ -240,34 +214,9 @@ async def test_redirect_is_not_followed_or_retried():
         await auth.close()
 
 
-@pytest.mark.parametrize(
-    "options",
-    [
-        {"nomi_tls_client_cert": "cert"},
-        {"nomi_tls_client_key": "key"},
-    ],
-)
-def test_https_does_not_allow_incomplete_client_credentials(options):
-    with pytest.raises(ValidationError, match="together"):
-        config("https://localhost", **options)
-
-
-def test_mismatched_client_key_fails_before_requests(certificates):
-    ca, server, client = certificates
-    with pytest.raises(ssl.SSLError):
-        AuthClient(
-            config(
-                "https://localhost",
-                nomi_tls_ca_cert=str(ca[2]),
-                nomi_tls_client_cert=str(client[2]),
-                nomi_tls_client_key=str(server[3]),
-            )
-        )
-
-
 @pytest.mark.asyncio
 async def test_secure_service_status_still_retries(certificates):
-    ca, _, _ = certificates
+    ca, _ = certificates
     calls = []
 
     def handler(request):
@@ -307,25 +256,8 @@ async def test_raw_ssl_alert_is_not_retried():
 
 
 @pytest.mark.asyncio
-async def test_proxy_certificate_rejection_is_not_retried():
-    calls = []
-
-    def handler(request):
-        calls.append(request)
-        return httpx.Response(403, json={"code": "MTLS_REQUIRED"})
-
-    auth = AuthClient(config("https://auth.test"), httpx.MockTransport(handler))
-    try:
-        with pytest.raises(BackendError, match="证书验证失败"):
-            await auth.submit("登录", "code", "group", "member", "event")
-        assert len(calls) == 1
-    finally:
-        await auth.close()
-
-
-@pytest.mark.asyncio
 async def test_secure_network_failure_has_generic_message(certificates):
-    ca, _, _ = certificates
+    ca, _ = certificates
     calls = []
 
     def handler(request):
@@ -337,8 +269,41 @@ async def test_secure_network_failure_has_generic_message(certificates):
         httpx.MockTransport(handler),
     )
     try:
-        with pytest.raises(BackendError, match="安全连接失败"):
+        with pytest.raises(BackendError, match="暂时不可用"):
             await auth.submit("登录", "code", "group", "member", "event")
-        assert len(calls) == 1
+        assert len(calls) == 3
     finally:
         await auth.close()
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "not-a-url",
+        "ftp://auth.test",
+        "https://user:password@auth.test",
+        "https://auth.test?query",
+        "https://auth.test#fragment",
+        "https://auth.test:invalid",
+    ],
+)
+def test_backend_url_rejects_misrouted_requests(url):
+    with pytest.raises(ValidationError):
+        config(url)
+
+
+def test_configuration_errors_hide_service_credentials():
+    token = "sensitive-test-credential-" + "x" * 32
+    with pytest.raises(ValidationError) as error:
+        Config(
+            nomi_auth_base_url="invalid",
+            nomi_bot_api_token=token,
+        )
+    assert token not in str(error.value)
+    assert "input_value" not in str(error.value)
+
+
+@pytest.mark.parametrize("credential", ["密" * 32, "x" * 32 + "\n", "x" * 32 + " "])
+def test_invalid_header_credentials_fail_during_configuration(credential):
+    with pytest.raises(ValidationError):
+        Config(nomi_bot_api_token=credential)

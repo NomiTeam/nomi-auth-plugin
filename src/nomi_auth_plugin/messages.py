@@ -9,7 +9,6 @@ REGISTRATION_PROMPT = (
 )
 
 ERROR_MESSAGES = {
-    "MTLS_REQUIRED": "账号服务证书验证失败，请联系管理员检查机器人证书配置。",
     "NO_PENDING_REGISTRATION": "没有待注册申请，请先发送启动器的登录码。",
     "REQUEST_IN_PROGRESS": "你已有待注册申请，请先完成或关闭启动器窗口。",
     "INVALID_NAME": "ID 须为 3 至 16 位字母、数字或下划线，本次请求已关闭。",
