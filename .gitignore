@@ -18,3 +18,10 @@ build/
 desktop.ini
 Thumbs.db
 .ruff_cache/
+
+.reference/
+.tools/
+
+*.p12
+
+*.pfx

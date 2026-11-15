@@ -1,6 +1,6 @@
 # Nomi Auth Plugin
 
-这是一个 NoneBot 插件，使用 QQ 官方适配器接收指定群的消息，再调用 [Nomi Auth](https://github.com/NomiTeam/nomi-auth) 完成无密码登录、注册和改名。插件不直接访问数据库。
+这是一个 NoneBot 插件，使用 QQ 官方适配器接收指定群的消息，再调用 [Nomi Auth](https://github.com/NomiTeam/nomi-auth) 或 [Nomi Auth Neo](https://github.com/NomiTeam/nomi-auth-neo) 完成无密码登录、注册和改名。插件不直接访问数据库。
 
 ## 命令
 
@@ -32,6 +32,18 @@ Windows 将 Python 路径改为 `.venv/Scripts/python.exe`。
 
 请求总等待默认 15 秒，每次 HTTP 请求默认最多 8 秒，包含有限重试。相同事件重试会保留原事件 ID，后端不会重复执行操作。
 
+双向 TLS 可通过以下字段配置；证书和私钥必须同时填写，服务地址必须使用 HTTPS：
+
+```dotenv
+NOMI_TLS_CLIENT_CERT=/path/to/client-chain.pem
+NOMI_TLS_CLIENT_KEY=/path/to/client-key.pem
+NOMI_TLS_CA_CERT=/path/to/server-ca.pem
+```
+
+`NOMI_TLS_CA_CERT` 可留空，使用系统信任链。客户端证书可包含中间证书链。插件始终校验服务端证书和主机名，不跟随重定向；证书文件无效时启动失败。显式配置 TLS 证书后，连接错误不会自动重试，避免重复尝试错误的证书；服务端临时错误仍按原规则重试。
+
+公网部署的双入口配置见 [mTLS 说明](https://github.com/NomiTeam/nomi-auth-neo/blob/main/deploy/MTLS.md)。
+
 ## 项目结构
 
 ```text
@@ -39,6 +51,7 @@ src/nomi_auth_plugin/
 ├── __init__.py - 注册命令和关闭回调
 ├── commands.py - 群校验、参数检查和回复
 ├── client.py   - 后端请求、重试和响应校验
+├── tls.py      - 证书加载和 TLS 校验
 ├── queue.py    - 按成员和验证码维护请求顺序
 ├── messages.py - 面向群友的中文提示
 └── config.py   - NoneBot 配置
